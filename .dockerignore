@@ -1,0 +1,102 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Storage (arquivos locais não devem ir para imagem)
+storage/
+output/
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+*.json
+
+# Database
+*.db
+*.sqlite
+vidfinger.db
+
+# Logs
+*.log
+logs/
+server.log
+.server.pid
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.github/
+
+# Docker
+docker/
+.dockerignore
+
+# Documentation (opcional, pode incluir se quiser)
+# docs/
+
+# Tests
+tests/
+test_*.py
+*_test.py
+
+# Scripts de desenvolvimento
+scripts/test_*.py
+scripts/setup.sh
+scripts/manage_server.sh
+scripts/start_server.sh
+
+# Alembic backup
+alembic.ini.bak
+
+# Samples
+samples/
+
+# Source code antigo (se não for necessário)
+src/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+

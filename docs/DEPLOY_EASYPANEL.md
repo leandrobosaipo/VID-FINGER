@@ -17,7 +17,13 @@ Este guia detalha como fazer deploy da aplicação VID-FINGER API no EasyPanel.
 4. Configure:
    - **Repository URL**: `https://github.com/leandrobosaipo/VID-FINGER.git`
    - **Branch**: `main`
-   - **Build Pack**: Python
+   - **Build Method**: **Dockerfile** (o EasyPanel detectará automaticamente o Dockerfile na raiz)
+
+**Importante**: O projeto inclui um `Dockerfile` na raiz que será detectado automaticamente pelo EasyPanel. Não é necessário configurar Build Pack ou comandos de build manualmente - o Dockerfile já está configurado para:
+- Instalar todas as dependências do sistema (FFmpeg, libpq-dev, gcc)
+- Instalar dependências Python do `requirements-api.txt`
+- Executar migrações do Alembic no start
+- Usar a variável `PORT` fornecida pelo EasyPanel
 
 ## Passo 2: Configurar Banco de Dados PostgreSQL
 
@@ -112,28 +118,19 @@ FFMPEG_PATH=/usr/bin/ffmpeg
 FFPROBE_PATH=/usr/bin/ffprobe
 ```
 
-## Passo 5: Configurar Build e Start Commands
+## Passo 5: Configurar Build e Start Commands (Usando Dockerfile)
 
-No EasyPanel, configure os comandos de build e start:
+**Com Dockerfile, você NÃO precisa configurar Build e Start Commands manualmente!**
 
-### Build Command
+O Dockerfile já está configurado para:
+- **Build**: Instala todas as dependências automaticamente
+- **Start**: Executa migrações e inicia o servidor automaticamente
 
-```bash
-pip install -r requirements-api.txt
-alembic upgrade head
-```
+O EasyPanel detectará o Dockerfile e usará os comandos definidos nele:
+- Migrações são executadas automaticamente no start: `alembic upgrade head`
+- Servidor inicia automaticamente: `uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}`
 
-### Start Command
-
-```bash
-python3 -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
-```
-
-**Nota**: O EasyPanel geralmente fornece a variável `$PORT` automaticamente. Se não funcionar, use a porta padrão `8000`:
-
-```bash
-python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
+**Nota**: A variável `PORT` é fornecida automaticamente pelo EasyPanel. O Dockerfile usa `${PORT:-8000}` como fallback caso a variável não esteja disponível.
 
 ## Passo 6: Configurar Porta e Domínio Público
 
@@ -146,29 +143,15 @@ python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 ## Passo 7: Verificar Dependências do Sistema
 
-O EasyPanel geralmente já tem Python instalado. Verifique se FFmpeg está disponível:
+**Com Dockerfile, todas as dependências do sistema já estão incluídas!**
 
-1. No terminal do EasyPanel (se disponível), execute:
-   ```bash
-   which ffmpeg
-   ```
+O Dockerfile instala automaticamente:
+- ✅ Python 3.11
+- ✅ FFmpeg e FFprobe
+- ✅ libpq-dev (para PostgreSQL)
+- ✅ gcc (compilador C)
 
-2. Se FFmpeg não estiver instalado, você pode precisar:
-   - Adicionar um script de instalação no build
-   - Ou usar uma imagem Docker customizada
-
-### Script de Build Alternativo (se FFmpeg não estiver disponível)
-
-```bash
-# Instalar dependências Python
-pip install -r requirements-api.txt
-
-# Tentar instalar FFmpeg (pode não funcionar dependendo do ambiente)
-apt-get update && apt-get install -y ffmpeg || echo "FFmpeg não instalado, algumas funcionalidades podem não funcionar"
-
-# Executar migrações
-alembic upgrade head
-```
+Não é necessário verificar ou instalar manualmente - tudo está no Dockerfile.
 
 ## Passo 8: Deploy
 
@@ -273,6 +256,14 @@ Após o deploy, monitore:
 - Configure lifecycle policy no Spaces para limpeza automática de arquivos antigos
 - Configure monitoramento e alertas
 - Configure backup do banco de dados
+
+## Documentação Adicional
+
+Para informações mais detalhadas, consulte:
+
+- **[Variáveis de Ambiente](VARIAVEIS_AMBIENTE.md)** - Lista completa de todas as variáveis necessárias
+- **[Configurar Serviços EasyPanel](SERVICOS_EASYPANEL.md)** - Guia detalhado para configurar PostgreSQL e Redis
+- **[Guia Passo a Passo Completo](GUIA_DEPLOY_EASYPANEL.md)** - Guia visual completo do deploy
 
 ## Referências
 
