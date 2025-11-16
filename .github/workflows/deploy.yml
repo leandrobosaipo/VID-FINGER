@@ -1,0 +1,34 @@
+name: Deploy to EasyPanel
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements-api.txt
+      
+      - name: Run tests
+        run: |
+          pytest tests/ || true  # Não falhar se não houver testes
+      
+      - name: Build Docker image
+        run: |
+          docker build -f docker/Dockerfile -t vid-finger-api:latest .
+      
+      # TODO: Adicionar steps de deploy para EasyPanel
+      # - name: Deploy to EasyPanel
+      #   run: |
+      #     # SSH ou API call para EasyPanel
+

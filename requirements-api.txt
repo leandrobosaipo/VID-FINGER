@@ -1,0 +1,34 @@
+# FastAPI e servidor
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0
+pydantic>=2.7.4,<3.0.0
+pydantic-settings>=2.2.1,<3.0.0
+
+# Database
+sqlalchemy>=2.0.23
+asyncpg>=0.29.0
+alembic>=1.12.1
+
+# Celery e Redis
+celery>=5.3.4
+redis>=5.0.1
+
+# HTTP client para webhooks
+httpx>=0.25.1
+
+# DigitalOcean Spaces (S3 compatible)
+boto3>=1.29.7
+
+# Dependências existentes do projeto
+pymediainfo>=7.0.0
+ffmpeg-python>=0.2.0
+numpy>=1.24.0
+scipy>=1.10.0
+opencv-python>=4.8.0
+# prnu - módulo local, não precisa instalar
+openai-whisper>=20231117
+pydub>=0.25.1
+
+# Utilitários
+python-multipart>=0.0.6
+
