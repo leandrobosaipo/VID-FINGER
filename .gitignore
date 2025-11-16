@@ -62,5 +62,5 @@ Thumbs.db
 alembic.ini.bak
 
 # Docker
-.dockerignore
+# .dockerignore deve estar no repositório (não ignorar)
 
