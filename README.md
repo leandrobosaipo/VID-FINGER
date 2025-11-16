@@ -346,6 +346,86 @@ Verifique se FFmpeg está instalado e funcionando:
 ffmpeg -version
 ```
 
+## 🌐 API REST
+
+O projeto inclui uma API REST completa construída com FastAPI para processamento de vídeos via HTTP.
+
+### Documentação da API
+
+Acesse a documentação interativa Swagger em:
+- **Local**: `http://localhost:8000/docs`
+- **Produção**: `https://seu-dominio.com/docs`
+
+### Endpoints Principais
+
+- `POST /api/v1/upload/analyze` - Upload e análise de vídeo em uma única requisição
+- `GET /api/v1/analysis/{analysis_id}` - Obter status e resultados de uma análise
+- `GET /api/v1/analysis/{analysis_id}/report` - Download do relatório JSON
+- `GET /api/v1/analysis/{analysis_id}/clean-video` - Download do vídeo limpo
+- `GET /health` - Health check da API
+- `GET /health/dependencies` - Verificação de dependências
+
+### Configuração Local
+
+1. Instale as dependências:
+```bash
+pip install -r requirements-api.txt
+```
+
+2. Configure as variáveis de ambiente (copie `.env.example` para `.env`):
+```bash
+cp .env.example .env
+# Edite .env com suas configurações
+```
+
+3. Inicialize o banco de dados:
+```bash
+python scripts/init_db.py
+```
+
+4. Inicie o servidor:
+```bash
+./scripts/manage_server.sh start
+# ou
+python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+### DigitalOcean Spaces (CDN)
+
+A API suporta upload automático para DigitalOcean Spaces após o processamento:
+
+1. Configure as variáveis de ambiente no `.env`:
+```bash
+DO_SPACES_REGION=nyc3
+DO_SPACES_ENDPOINT=https://nyc3.digitaloceanspaces.com
+DO_SPACES_BUCKET=seu-bucket
+DO_SPACES_KEY=sua-access-key
+DO_SPACES_SECRET=sua-secret-key
+OUTPUT_PREFIX=vid-finger
+UPLOAD_TO_CDN=True
+```
+
+2. Os arquivos serão automaticamente enviados para o Spaces após o processamento:
+   - Relatórios JSON
+   - Vídeos limpos
+   - URLs públicas serão salvas no banco de dados
+
+## 🚀 Deploy no EasyPanel
+
+Para fazer deploy da API em produção no EasyPanel, consulte a documentação completa:
+
+📖 **[Guia de Deploy no EasyPanel](docs/DEPLOY_EASYPANEL.md)**
+
+### Resumo Rápido
+
+1. Crie um novo projeto no EasyPanel conectado ao repositório GitHub
+2. Configure PostgreSQL e Redis como serviços dependentes
+3. Configure todas as variáveis de ambiente (veja `.env.example`)
+4. **IMPORTANTE**: Configure `API_BASE_URL` com o domínio público
+5. Configure build command: `pip install -r requirements-api.txt && alembic upgrade head`
+6. Configure start command: `python3 -m uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+7. Faça o deploy e verifique a saúde em `/health`
+
 ## 📝 Licença
 
 Este é um projeto para fins de demonstração e validação.
@@ -355,5 +435,5 @@ Este é um projeto para fins de demonstração e validação.
 - Modelo de ML treinado para fingerprint SORA
 - Detector de difusão baseado em PatchGAN
 - Ferramenta CLI + GUI web
-- API REST para automações
+- ✅ API REST para automações (implementado)
 - Exportar relatório pericial assinado (PDF digital)
