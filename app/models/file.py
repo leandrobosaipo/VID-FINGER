@@ -20,7 +20,9 @@ class File(Base):
     __tablename__ = "files"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    analysis_id = Column(UUID(as_uuid=True), ForeignKey("analyses.id"), nullable=False)
+    # Pode ser nulo no momento da criação do arquivo.
+    # Em alguns fluxos (como upload simplificado), o arquivo é persistido antes da análise existir.
+    analysis_id = Column(UUID(as_uuid=True), ForeignKey("analyses.id"), nullable=True)
     file_type = Column(SQLEnum(FileType), nullable=False)
     original_filename = Column(String, nullable=False)
     stored_filename = Column(String, nullable=False)
@@ -37,4 +39,3 @@ class File(Base):
     analysis_as_original = relationship("Analysis", foreign_keys="Analysis.original_file_id", back_populates="original_file")
     analysis_as_report = relationship("Analysis", foreign_keys="Analysis.report_file_id", back_populates="report_file")
     analysis_as_clean = relationship("Analysis", foreign_keys="Analysis.clean_video_id", back_populates="clean_video_file")
-

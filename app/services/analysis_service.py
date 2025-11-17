@@ -38,17 +38,17 @@ class AnalysisService:
         if not upload_status or not upload_status["is_complete"]:
             raise ValueError("Upload incompleto")
         
-        # Gerar ID da análise
+        # Gerar ID da análise (usado também para estruturar o caminho do arquivo)
         analysis_id = uuid.uuid4()
         
-        # Finalizar upload e montar arquivo
+        # Finalizar upload e montar arquivo físico
         output_dir = FileService.generate_storage_path(str(analysis_id), FileType.original)
         file_path, checksum = UploadService.complete_upload(upload_id, output_dir)
         
-        # Criar registro de arquivo original
+        # 1) Criar e persistir o registro do arquivo antes da análise
         original_file = File(
             id=uuid.uuid4(),
-            analysis_id=analysis_id,
+            analysis_id=None,  # será vinculado à análise após sua criação
             file_type=FileType.original,
             original_filename=upload_status["filename"],
             stored_filename=file_path.name,
@@ -57,8 +57,12 @@ class AnalysisService:
             mime_type="video/mp4",  # TODO: Detectar MIME type real
             checksum=checksum
         )
+        db.add(original_file)
+        await db.commit()
+        await db.refresh(original_file)
+        logger.info(f"[ANALYSIS] file_saved id={original_file.id} path={original_file.file_path}")
         
-        # Criar registro de análise
+        # 2) Criar análise referenciando o arquivo já persistido
         analysis = Analysis(
             id=analysis_id,
             status=AnalysisStatus.pending,
@@ -67,8 +71,12 @@ class AnalysisService:
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
         )
+        db.add(analysis)
+        await db.commit()
+        await db.refresh(analysis)
+        logger.info(f"[ANALYSIS] analysis_created id={analysis.id} original_file_id={analysis.original_file_id}")
         
-        # Criar etapas iniciais
+        # 3) Criar etapas iniciais e vincular arquivo à análise
         steps = [
             AnalysisStep(
                 id=uuid.uuid4(),
@@ -115,16 +123,14 @@ class AnalysisService:
                 progress=0
             )
         ]
-        
-        # Salvar no banco
-        db.add(original_file)
-        db.add(analysis)
         for step in steps:
             db.add(step)
         
+        # Atualizar vínculo do arquivo com a análise
+        original_file.analysis_id = analysis.id
+        db.add(original_file)
+        
         await db.commit()
-        await db.refresh(analysis)
-        await db.refresh(original_file)
         
         # Upload para CDN se configurado
         if settings.UPLOAD_TO_CDN and storage_service.s3_client:
@@ -287,4 +293,3 @@ class AnalysisService:
             select(Analysis).where(Analysis.id == uuid.UUID(analysis_id))
         )
         return result.scalar_one_or_none()
-
