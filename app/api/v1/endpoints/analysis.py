@@ -8,7 +8,9 @@ from app.services.analysis_service import AnalysisService
 from app.api.v1.schemas import AnalysisResponse, AnalysisListResponse
 from app.utils.formatters import format_success_response, format_error_response
 from app.config import settings
+from app.models.file import File
 import uuid
+from typing import Optional
 
 router = APIRouter()
 
@@ -66,16 +68,27 @@ async def get_analysis(
         else:
             base_url = settings.API_BASE_URL or "http://localhost:8000"
         
-        # URLs para arquivos
-        original_video_url = f"{base_url}/api/v1/files/{analysis_id}/original"
-        clean_video_url = None
-        report_url = None
+        async def resolve_file_url(file_id: Optional[uuid.UUID], default_url: Optional[str]) -> Optional[str]:
+            if not file_id:
+                return None
+            result = await db.execute(select(File).where(File.id == file_id))
+            file_record = result.scalar_one_or_none()
+            if file_record and file_record.cdn_uploaded and file_record.cdn_url:
+                return file_record.cdn_url
+            return default_url
         
-        if analysis.clean_video_id:
-            clean_video_url = f"{base_url}/api/v1/files/{analysis_id}/clean_video"
-        
-        if analysis.report_file_id:
-            report_url = f"{base_url}/api/v1/reports/{analysis_id}/report"
+        original_video_url = await resolve_file_url(
+            analysis.original_file_id,
+            f"{base_url}/api/v1/files/{analysis_id}/original"
+        )
+        clean_video_url = await resolve_file_url(
+            analysis.clean_video_id,
+            f"{base_url}/api/v1/files/{analysis_id}/clean_video" if analysis.clean_video_id else None
+        )
+        report_url = await resolve_file_url(
+            analysis.report_file_id,
+            f"{base_url}/api/v1/reports/{analysis_id}/report" if analysis.report_file_id else None
+        )
         
         return AnalysisResponse(
             id=str(analysis.id),
@@ -87,7 +100,10 @@ async def get_analysis(
             started_at=analysis.started_at,
             completed_at=analysis.completed_at,
             classification=analysis.classification,
-            confidence=analysis.confidence
+            confidence=analysis.confidence,
+            clean_video_url=clean_video_url,
+            report_url=report_url,
+            original_video_url=original_video_url
         )
     
     except HTTPException:
@@ -137,14 +153,45 @@ async def list_analyses(
         result = await db.execute(query)
         analyses = result.scalars().all()
         
+        # Pré-carregar arquivos para mapear URLs CDN
+        file_ids = set()
+        for analysis in analyses:
+            for file_id in [analysis.original_file_id, analysis.clean_video_id, analysis.report_file_id]:
+                if file_id:
+                    file_ids.add(file_id)
+        
+        file_map = {}
+        if file_ids:
+            files_result = await db.execute(
+                select(File).where(File.id.in_(list(file_ids)))
+            )
+            file_map = {file.id: file for file in files_result.scalars()}
+        
         # Formatar respostas
         items = []
         for analysis in analyses:
             # Gerar URLs base
             base_url = settings.API_BASE_URL or "http://localhost:8000"
-            original_video_url = f"{base_url}/api/v1/files/{str(analysis.id)}/original"
-            clean_video_url = f"{base_url}/api/v1/files/{str(analysis.id)}/clean_video" if analysis.clean_video_id else None
-            report_url = f"{base_url}/api/v1/reports/{str(analysis.id)}/report" if analysis.report_file_id else None
+            original_file = file_map.get(analysis.original_file_id)
+            clean_file = file_map.get(analysis.clean_video_id)
+            report_file = file_map.get(analysis.report_file_id)
+            
+            original_video_url = (
+                original_file.cdn_url if original_file and original_file.cdn_uploaded and original_file.cdn_url
+                else f"{base_url}/api/v1/files/{str(analysis.id)}/original"
+            )
+            clean_video_url = None
+            if analysis.clean_video_id:
+                clean_video_url = (
+                    clean_file.cdn_url if clean_file and clean_file.cdn_uploaded and clean_file.cdn_url
+                    else f"{base_url}/api/v1/files/{str(analysis.id)}/clean_video"
+                )
+            report_url = None
+            if analysis.report_file_id:
+                report_url = (
+                    report_file.cdn_url if report_file and report_file.cdn_uploaded and report_file.cdn_url
+                    else f"{base_url}/api/v1/reports/{str(analysis.id)}/report"
+                )
             
             items.append(AnalysisResponse(
                 id=str(analysis.id),

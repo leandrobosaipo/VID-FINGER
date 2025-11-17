@@ -18,12 +18,14 @@ class ChunkedUploadManager:
         self.total_chunks: Optional[int] = None
         self.file_size: Optional[int] = None
         self.filename: Optional[str] = None
-        
-    def init_upload(self, filename: str, file_size: int, total_chunks: int):
+        self.mime_type: Optional[str] = None
+    
+    def init_upload(self, filename: str, file_size: int, total_chunks: int, mime_type: Optional[str] = None):
         """Inicializa upload."""
         self.filename = filename
         self.file_size = file_size
         self.total_chunks = total_chunks
+        self.mime_type = mime_type
         
         # Salvar metadados
         metadata_file = self.upload_dir / "metadata.json"
@@ -32,7 +34,8 @@ class ChunkedUploadManager:
             json.dump({
                 "filename": filename,
                 "file_size": file_size,
-                "total_chunks": total_chunks
+                "total_chunks": total_chunks,
+                "mime_type": mime_type
             }, f)
     
     def save_chunk(self, chunk_number: int, chunk_data: bytes) -> bool:
@@ -129,9 +132,10 @@ class ChunkedUploadManager:
             import json
             with open(metadata_file, "r") as f:
                 metadata = json.load(f)
-                manager.filename = metadata["filename"]
-                manager.file_size = metadata["file_size"]
-                manager.total_chunks = metadata["total_chunks"]
+                manager.filename = metadata.get("filename")
+                manager.file_size = metadata.get("file_size")
+                manager.total_chunks = metadata.get("total_chunks")
+                manager.mime_type = metadata.get("mime_type")
         
         # Carregar chunks recebidos
         for chunk_file in upload_dir.glob("chunk_*"):
@@ -139,4 +143,3 @@ class ChunkedUploadManager:
             manager.chunks_received[chunk_num] = True
         
         return manager
-

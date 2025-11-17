@@ -11,6 +11,16 @@ from app.models.file import FileType
 class FileService:
     """Serviço para gerenciar arquivos."""
     
+    STORAGE_SUBDIRS = ["original", "reports", "clean", "uploads", "output"]
+    
+    @staticmethod
+    def ensure_storage_structure() -> None:
+        """Garante que toda a estrutura de diretórios de storage exista e seja gravável."""
+        base_path = Path(settings.STORAGE_PATH)
+        base_path.mkdir(parents=True, exist_ok=True)
+        for subdir in FileService.STORAGE_SUBDIRS:
+            (base_path / subdir).mkdir(parents=True, exist_ok=True)
+    
     @staticmethod
     def generate_storage_path(analysis_id: str, file_type: FileType) -> Path:
         """Gera caminho de armazenamento para arquivo."""
@@ -55,4 +65,3 @@ class FileService:
     def get_file_size(file_path: Path) -> int:
         """Obtém tamanho do arquivo."""
         return file_path.stat().st_size
-

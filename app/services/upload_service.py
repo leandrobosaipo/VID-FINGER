@@ -46,7 +46,7 @@ class UploadService:
         
         # Inicializar manager
         manager = ChunkedUploadManager(upload_id)
-        manager.init_upload(filename, file_size, total_chunks)
+        manager.init_upload(filename, file_size, total_chunks, mime_type)
         
         return upload_id, chunk_size, total_chunks
     
@@ -113,6 +113,7 @@ class UploadService:
             "upload_id": upload_id,
             "filename": manager.filename,
             "file_size": manager.file_size,
+            "mime_type": manager.mime_type,
             "total_chunks": manager.total_chunks,
             "chunks_received": manager.get_received_chunks(),
             "progress": manager.get_progress(),
@@ -152,7 +153,7 @@ class UploadService:
         
         # Inicializar manager
         manager = ChunkedUploadManager(upload_id)
-        manager.init_upload(filename, file_size, total_chunks)
+        manager.init_upload(filename, file_size, total_chunks, mime_type)
         
         # Salvar arquivo em chunks se necessário
         if file_size <= chunk_size:
@@ -166,4 +167,3 @@ class UploadService:
                 manager.save_chunk(chunk_number, chunk_data)
         
         return upload_id
-
