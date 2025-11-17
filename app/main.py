@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.config import settings
 from app.api.v1.router import api_router
+from app.services.file_service import FileService
 
 # Configurar logging humanizado
 logging.basicConfig(
@@ -28,6 +29,13 @@ async def lifespan(app: FastAPI):
     logger.info(format_log_message("🚀", "Iniciando aplicação VID-FINGER..."))
     logger.info(format_log_message("📋", f"Versão: {settings.APP_VERSION}"))
     logger.info(format_log_message("🔧", f"Modo DEBUG: {'Ativado' if settings.DEBUG else 'Desativado'}"))
+    # Garantir estrutura de storage antes de iniciar requisições
+    try:
+        FileService.ensure_storage_structure()
+        logger.info(format_log_message("📂", f"Storage inicializado em {settings.STORAGE_PATH}"))
+    except Exception as storage_error:
+        logger.error(format_log_message("❌", f"Falha ao preparar storage: {storage_error}"))
+        raise
     
     # Verificar configurações importantes (sem senhas)
     if settings.UPLOAD_TO_CDN:
@@ -153,6 +161,5 @@ async def health_dependencies():
     """Health check de dependências."""
     from app.api.v1.endpoints.debug import health_dependencies as check_deps
     return await check_deps()
-
 
 

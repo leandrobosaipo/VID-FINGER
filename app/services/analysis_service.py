@@ -3,6 +3,8 @@ import uuid
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
+import mimetypes
+import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.analysis import Analysis, AnalysisStatus
@@ -13,7 +15,6 @@ from app.services.file_service import FileService
 from app.services.storage_service import storage_service
 from app.services.webhook_service import WebhookService
 from app.config import settings
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,14 @@ class AnalysisService:
         output_dir = FileService.generate_storage_path(str(analysis_id), FileType.original)
         file_path, checksum = UploadService.complete_upload(upload_id, output_dir)
         
+        # Detectar MIME type e tamanho a partir dos metadados do upload
+        mime_type = upload_status.get("mime_type")
+        if not mime_type:
+            mime_type, _ = mimetypes.guess_type(upload_status["filename"])
+        if not mime_type:
+            mime_type = "video/mp4"
+        file_size = upload_status.get("file_size") or FileService.get_file_size(file_path)
+        
         # 1) Criar e persistir o registro do arquivo antes da análise
         original_file = File(
             id=uuid.uuid4(),
@@ -53,8 +62,8 @@ class AnalysisService:
             original_filename=upload_status["filename"],
             stored_filename=file_path.name,
             file_path=str(file_path),
-            file_size=FileService.get_file_size(file_path),
-            mime_type="video/mp4",  # TODO: Detectar MIME type real
+            file_size=file_size,
+            mime_type=mime_type,
             checksum=checksum
         )
         db.add(original_file)
@@ -151,6 +160,7 @@ class AnalysisService:
                         original_file.cdn_url = cdn_url
                         original_file.cdn_uploaded = True
                         await db.commit()
+                        await db.refresh(original_file)
                         logger.info(f"Arquivo enviado para CDN: {cdn_url}")
             except Exception as e:
                 logger.error(f"Erro ao fazer upload para CDN: {e}")
