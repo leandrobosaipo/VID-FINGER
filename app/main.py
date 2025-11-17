@@ -1,8 +1,59 @@
 """Aplicação FastAPI principal."""
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from app.config import settings
 from app.api.v1.router import api_router
+
+# Configurar logging humanizado
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(levelname)s %(name)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+logger = logging.getLogger(__name__)
+
+
+def format_log_message(emoji: str, message: str) -> str:
+    """Formata mensagem de log com emoji."""
+    return f"{emoji} {message}"
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Gerenciador de ciclo de vida da aplicação."""
+    # Startup
+    logger.info(format_log_message("🚀", "Iniciando aplicação VID-FINGER..."))
+    logger.info(format_log_message("📋", f"Versão: {settings.APP_VERSION}"))
+    logger.info(format_log_message("🔧", f"Modo DEBUG: {'Ativado' if settings.DEBUG else 'Desativado'}"))
+    
+    # Verificar configurações importantes (sem senhas)
+    if settings.UPLOAD_TO_CDN:
+        logger.info(format_log_message("☁️", "Upload para CDN: Habilitado"))
+        if settings.DO_SPACES_BUCKET:
+            logger.info(format_log_message("📦", f"Bucket CDN: {settings.DO_SPACES_BUCKET}"))
+        else:
+            logger.warning(format_log_message("⚠️", "Bucket CDN não configurado"))
+    else:
+        logger.info(format_log_message("💾", "Upload para CDN: Desabilitado (armazenamento local)"))
+    
+    # Verificar banco de dados
+    db_type = "PostgreSQL" if "postgresql" in settings.DATABASE_URL else "SQLite"
+    logger.info(format_log_message("🗄️", f"Banco de dados: {db_type}"))
+    
+    # Verificar Redis
+    if settings.REDIS_URL:
+        logger.info(format_log_message("🔴", f"Redis: {settings.REDIS_URL.split('@')[-1] if '@' in settings.REDIS_URL else 'Configurado'}"))
+    
+    logger.info(format_log_message("✅", "Aplicação inicializada com sucesso"))
+    
+    yield
+    
+    # Shutdown
+    logger.info(format_log_message("🛑", "Encerrando aplicação..."))
+    logger.info(format_log_message("👋", "Aplicação encerrada"))
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -37,6 +88,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
+    lifespan=lifespan,
     contact={
         "name": "VID-FINGER API Support",
         "url": "https://github.com/your-repo/vid-finger"

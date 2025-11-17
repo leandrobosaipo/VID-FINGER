@@ -1,6 +1,9 @@
 """Configurações da aplicação."""
 from typing import Optional
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Tentar importar pydantic-settings com fallback robusto
 try:
@@ -73,6 +76,23 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+    
+    def __init__(self, **kwargs):
+        """Inicializar Settings e validar DATABASE_URL."""
+        super().__init__(**kwargs)
+        self._validate_database_url()
+    
+    def _validate_database_url(self):
+        """Valida formato de DATABASE_URL e emite warning se necessário."""
+        if not self.DATABASE_URL:
+            return
+        
+        # Verificar se está usando postgresql:// sem +asyncpg
+        if self.DATABASE_URL.startswith("postgresql://") and not self.DATABASE_URL.startswith("postgresql+asyncpg://"):
+            logger.warning(
+                "⚠️  DATABASE_URL está usando driver síncrono (postgresql://). "
+                "Para uso com async_engine, altere para postgresql+asyncpg://"
+            )
 
 
 settings = Settings()
