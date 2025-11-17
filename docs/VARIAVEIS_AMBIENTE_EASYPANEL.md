@@ -16,8 +16,10 @@ Copie **TODO** o bloco abaixo e cole nas variáveis de ambiente do EasyPanel:
 # ============================================
 # OBRIGATÓRIAS
 # ============================================
-DATABASE_URL=postgresql+asyncpg://postgres:AA393A2FC576136C7FE79B523924A@criadordigital_postgres:5432/criadordigital?sslmode=disable
-DATABASE_URL_SYNC=postgresql://postgres:AA393A2FC576136C7FE79B523924A@criadordigital_postgres:5432/criadordigital
+# IMPORTANTE: não usar ?sslmode=disable com asyncpg
+DATABASE_URL=postgresql+asyncpg://postgres:AA393A2FC576136C7FE79B523924A@criadordigital_postgres:5432/criadordigital
+# Se precisar desabilitar SSL, use o parâmetro apenas em DATABASE_URL_SYNC (psycopg2)
+DATABASE_URL_SYNC=postgresql://postgres:AA393A2FC576136C7FE79B523924A@criadordigital_postgres:5432/criadordigital?sslmode=disable
 REDIS_URL=redis://default:ABF93E2D72196575E616CB41A49EE@criadordigital_redis:6379/0
 CELERY_BROKER_URL=redis://default:ABF93E2D72196575E616CB41A49EE@criadordigital_redis:6379/0
 CELERY_RESULT_BACKEND=redis://default:ABF93E2D72196575E616CB41A49EE@criadordigital_redis:6379/0
@@ -58,17 +60,19 @@ APP_VERSION=1.0.0
 
 ## 🔍 O Que Foi Corrigido
 
-### ❌ ANTES (Incorreto):
+### ❌ ANTES (Incorreto - driver síncrono e sslmode com asyncpg):
 ```
 DATABASE_URL=postgresql://postgres:AA393A2FC576136C7FE79B523924A@criadordigital_postgres:5432/criadordigital?sslmode=disable
 ```
 
-### ✅ AGORA (Correto):
+### ✅ AGORA (Correto para asyncpg):
 ```
-DATABASE_URL=postgresql+asyncpg://postgres:AA393A2FC576136C7FE79B523924A@criadordigital_postgres:5432/criadordigital?sslmode=disable
+DATABASE_URL=postgresql+asyncpg://postgres:AA393A2FC576136C7FE79B523924A@criadordigital_postgres:5432/criadordigital
 ```
 
-**Diferença**: Adicionado `+asyncpg` após `postgresql` para suportar conexões assíncronas.
+**Diferenças**:
+- Adicionado `+asyncpg` após `postgresql` para suportar conexões assíncronas.
+- Removido `?sslmode=disable`, que causa erro com o driver asyncpg.
 
 ---
 
@@ -172,4 +176,3 @@ O código tentará usar ambas automaticamente.
 - [Variáveis de Ambiente Completas](VARIAVEIS_AMBIENTE.md) - Documentação técnica completa
 - [Configurar Serviços](SERVICOS_EASYPANEL.md) - Como criar PostgreSQL e Redis
 - [Guia Deploy Completo](GUIA_DEPLOY_EASYPANEL.md) - Passo a passo completo
-

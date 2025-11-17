@@ -24,21 +24,16 @@ O EasyPanel pode fazer deploy automático quando detectar mudanças no GitHub. S
 1. No EasyPanel, vá para **"Environment Variables"** ou **"Variáveis de Ambiente"**
 2. Encontre a variável `DATABASE_URL`
 3. Clique para **editar**
-4. **Substitua** o início da URL:
+4. **Substitua** a URL inteira para remover o `sslmode` e usar o driver assíncrono:
 
-   **DE:**
+   **DE (antigo / incorreto com asyncpg):**
    ```
    postgresql://postgres:AA393A2FC576136C7FE79B523924A@criadordigital_postgres:5432/criadordigital?sslmode=disable
    ```
 
-   **PARA:**
+   **PARA (novo / correto para asyncpg):**
    ```
-   postgresql+asyncpg://postgres:AA393A2FC576136C7FE79B523924A@criadordigital_postgres:5432/criadordigital?sslmode=disable
-   ```
-
-   **Ou simplesmente**: Adicione `+asyncpg` após `postgresql`:
-   ```
-   postgresql+asyncpg://postgres:AA393A2FC576136C7FE79B523924A@criadordigital_postgres:5432/criadordigital?sslmode=disable
+   postgresql+asyncpg://postgres:AA393A2FC576136C7FE79B523924A@criadordigital_postgres:5432/criadordigital
    ```
 
 5. **Salve** a alteração
@@ -114,6 +109,7 @@ Após o deploy bem-sucedido:
 
 **Solução**:
 - Verifique se `DATABASE_URL` usa `postgresql+asyncpg://` (não `postgresql://`)
+- Verifique se **não** há `?sslmode=disable` em `DATABASE_URL` (isso é apenas para `DATABASE_URL_SYNC`)
 - Verifique se o serviço PostgreSQL está rodando
 - Verifique se as credenciais estão corretas
 - Teste a conexão manualmente se possível
@@ -141,4 +137,3 @@ Após tudo funcionar:
 - **[Variáveis Prontas para Copiar](VARIAVEIS_AMBIENTE_EASYPANEL.md)** - Blocos completos para copiar/colar
 - **[Variáveis Completas](VARIAVEIS_AMBIENTE.md)** - Documentação técnica completa
 - **[Guia Deploy Completo](GUIA_DEPLOY_EASYPANEL.md)** - Passo a passo completo
-

@@ -2,10 +2,45 @@
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import create_engine
+from sqlalchemy.engine.url import make_url
 from app.config import settings
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def sanitize_async_database_url(url: str) -> str:
+    """
+    Remove parâmetros incompatíveis com asyncpg (como sslmode) da DATABASE_URL.
+    
+    Isso torna a aplicação mais tolerante a configurações antigas no EasyPanel
+    que usavam '?sslmode=disable' com o driver asyncpg, o que causa:
+    'connect() got an unexpected keyword argument \"sslmode\"'.
+    """
+    if not url:
+        return url
+    
+    try:
+        parsed = make_url(url)
+    except Exception:
+        # Se não for uma URL reconhecida pelo SQLAlchemy, retorna como está
+        return url
+    
+    # Aplicar apenas para o driver assíncrono do PostgreSQL via asyncpg
+    if not parsed.drivername.startswith("postgresql+asyncpg"):
+        return url
+    
+    query = dict(parsed.query)
+    if "sslmode" in query:
+        logger.warning(
+            "⚠️ Removendo parâmetro 'sslmode' de DATABASE_URL para asyncpg "
+            "(não suportado pelo driver, pode causar erro de conexão)."
+        )
+        query.pop("sslmode", None)
+        parsed = parsed.set(query=query)
+        return str(parsed)
+    
+    return url
 
 
 def validate_database_url(url: str, is_async: bool = True) -> None:
@@ -55,7 +90,8 @@ def validate_database_url(url: str, is_async: bool = True) -> None:
 
 # Validar DATABASE_URL antes de criar engines
 try:
-    validate_database_url(settings.DATABASE_URL, is_async=True)
+    async_database_url = sanitize_async_database_url(settings.DATABASE_URL)
+    validate_database_url(async_database_url, is_async=True)
     logger.info("✅ DATABASE_URL validado: usando driver assíncrono (asyncpg)")
 except ValueError as e:
     # Re-raise para parar a aplicação com erro claro
@@ -65,7 +101,7 @@ except ValueError as e:
 try:
     logger.info("🔄 Criando conexão assíncrona com banco de dados...")
     async_engine = create_async_engine(
-        settings.DATABASE_URL,
+        async_database_url,
         echo=settings.DEBUG,
         future=True,
         connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {}
@@ -107,4 +143,3 @@ async def get_db():
             yield session
         finally:
             await session.close()
-
