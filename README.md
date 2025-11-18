@@ -426,6 +426,48 @@ Para fazer deploy da API em produção no EasyPanel, consulte a documentação c
 6. Configure start command: `python3 -m uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 7. Faça o deploy e verifique a saúde em `/health`
 
+## 🔔 Webhooks por Etapa
+
+O sistema envia webhooks detalhados a cada etapa do processamento, permitindo criar dashboards em tempo real.
+
+### Configuração
+
+Ao enviar uma análise, inclua o parâmetro `webhook_url`:
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/upload/analyze" \
+  -F "file=@video.mp4" \
+  -F "webhook_url=https://seu-webhook.com/receive"
+```
+
+### Eventos Disponíveis
+
+- `analysis.started` - Análise iniciada
+- `analysis.step.started` - Etapa iniciada (com estatísticas completas)
+- `analysis.step.completed` - Etapa concluída (com resultados e estatísticas)
+- `analysis.completed` - Análise concluída
+- `analysis.failed` - Análise falhou
+
+### Testar Webhooks
+
+Use o script de teste:
+
+```bash
+python scripts/test_webhooks.py samples/test_video.mp4 https://webhook.site/unique-id
+```
+
+Ou use webhook.site para receber webhooks em tempo real durante os testes.
+
+### Documentação Completa
+
+📖 **[Guia Completo de Webhooks](docs/WEBHOOKS_POR_ETAPA.md)**
+
+Inclui:
+- Estrutura completa dos payloads
+- Exemplos de integração com n8n
+- Estatísticas disponíveis
+- Resultados por etapa
+
 ## 📝 Licença
 
 Este é um projeto para fins de demonstração e validação.
@@ -436,4 +478,5 @@ Este é um projeto para fins de demonstração e validação.
 - Detector de difusão baseado em PatchGAN
 - Ferramenta CLI + GUI web
 - ✅ API REST para automações (implementado)
+- ✅ Webhooks por etapa (implementado)
 - Exportar relatório pericial assinado (PDF digital)
