@@ -100,6 +100,19 @@ class AnalysisProcessor:
                 analysis_id, StepName.metadata_extraction, StepStatus.running, 0, db
             )
             
+            # Enviar webhook de início da etapa
+            if analysis.webhook_url:
+                try:
+                    await WebhookService.send_step_update(
+                        webhook_url=analysis.webhook_url,
+                        analysis_id=analysis_id,
+                        step_name=StepName.metadata_extraction,
+                        is_starting=True,
+                        db=db
+                    )
+                except Exception as e:
+                    logger.error(f"[{analysis_id}] Erro ao enviar webhook de início: {e}")
+            
             logger.info(f"[{analysis_id}] Extraindo metadados do arquivo: {video_path}")
             metadata = extract_metadata(str(video_path))
             gop_size = estimate_gop_size(str(video_path))
@@ -118,6 +131,21 @@ class AnalysisProcessor:
                 analysis_id, StepName.metadata_extraction, StepStatus.completed, 100, db
             )
             await db.refresh(analysis)
+            
+            # Enviar webhook de conclusão da etapa
+            if analysis.webhook_url:
+                try:
+                    await WebhookService.send_step_update(
+                        webhook_url=analysis.webhook_url,
+                        analysis_id=analysis_id,
+                        step_name=StepName.metadata_extraction,
+                        is_starting=False,
+                        db=db,
+                        step_result={"metadata": metadata}
+                    )
+                except Exception as e:
+                    logger.error(f"[{analysis_id}] Erro ao enviar webhook de conclusão: {e}")
+            
             logger.info(f"[{analysis_id}] ===== ETAPA CONCLUÍDA: metadata_extraction =====")
             
             # 2. Análise PRNU
@@ -125,6 +153,19 @@ class AnalysisProcessor:
             await AnalysisProcessor._update_step(
                 analysis_id, StepName.prnu, StepStatus.running, 0, db
             )
+            
+            # Enviar webhook de início da etapa
+            if analysis.webhook_url:
+                try:
+                    await WebhookService.send_step_update(
+                        webhook_url=analysis.webhook_url,
+                        analysis_id=analysis_id,
+                        step_name=StepName.prnu,
+                        is_starting=True,
+                        db=db
+                    )
+                except Exception as e:
+                    logger.error(f"[{analysis_id}] Erro ao enviar webhook de início: {e}")
             
             logger.info(f"[{analysis_id}] Analisando PRNU (ruído do sensor)...")
             baseline_profile = None  # TODO: Carregar baseline se disponível
@@ -135,6 +176,21 @@ class AnalysisProcessor:
                 analysis_id, StepName.prnu, StepStatus.completed, 100, db
             )
             await db.refresh(analysis)
+            
+            # Enviar webhook de conclusão da etapa
+            if analysis.webhook_url:
+                try:
+                    await WebhookService.send_step_update(
+                        webhook_url=analysis.webhook_url,
+                        analysis_id=analysis_id,
+                        step_name=StepName.prnu,
+                        is_starting=False,
+                        db=db,
+                        step_result=prnu_analysis
+                    )
+                except Exception as e:
+                    logger.error(f"[{analysis_id}] Erro ao enviar webhook de conclusão: {e}")
+            
             logger.info(f"[{analysis_id}] ===== ETAPA CONCLUÍDA: prnu =====")
             
             # 3. Análise FFT
@@ -142,6 +198,19 @@ class AnalysisProcessor:
             await AnalysisProcessor._update_step(
                 analysis_id, StepName.fft, StepStatus.running, 0, db
             )
+            
+            # Enviar webhook de início da etapa
+            if analysis.webhook_url:
+                try:
+                    await WebhookService.send_step_update(
+                        webhook_url=analysis.webhook_url,
+                        analysis_id=analysis_id,
+                        step_name=StepName.fft,
+                        is_starting=True,
+                        db=db
+                    )
+                except Exception as e:
+                    logger.error(f"[{analysis_id}] Erro ao enviar webhook de início: {e}")
             
             logger.info(f"[{analysis_id}] Analisando FFT temporal...")
             fft_analysis = detect_diffusion_signature(str(video_path))
@@ -152,6 +221,21 @@ class AnalysisProcessor:
                 analysis_id, StepName.fft, StepStatus.completed, 100, db
             )
             await db.refresh(analysis)
+            
+            # Enviar webhook de conclusão da etapa
+            if analysis.webhook_url:
+                try:
+                    await WebhookService.send_step_update(
+                        webhook_url=analysis.webhook_url,
+                        analysis_id=analysis_id,
+                        step_name=StepName.fft,
+                        is_starting=False,
+                        db=db,
+                        step_result=fft_analysis
+                    )
+                except Exception as e:
+                    logger.error(f"[{analysis_id}] Erro ao enviar webhook de conclusão: {e}")
+            
             logger.info(f"[{analysis_id}] ===== ETAPA CONCLUÍDA: fft =====")
             
             # 4. Integridade de metadados
@@ -181,6 +265,19 @@ class AnalysisProcessor:
                 analysis_id, StepName.classification, StepStatus.running, 0, db
             )
             
+            # Enviar webhook de início da etapa
+            if analysis.webhook_url:
+                try:
+                    await WebhookService.send_step_update(
+                        webhook_url=analysis.webhook_url,
+                        analysis_id=analysis_id,
+                        step_name=StepName.classification,
+                        is_starting=True,
+                        db=db
+                    )
+                except Exception as e:
+                    logger.error(f"[{analysis_id}] Erro ao enviar webhook de início: {e}")
+            
             logger.info(f"[{analysis_id}] Classificando vídeo com base em todas as análises...")
             classification = classify_video(
                 fingerprint,
@@ -199,10 +296,50 @@ class AnalysisProcessor:
                 analysis_id, StepName.classification, StepStatus.completed, 100, db
             )
             await db.refresh(analysis)
+            
+            # Enviar webhook de conclusão da etapa
+            if analysis.webhook_url:
+                try:
+                    await WebhookService.send_step_update(
+                        webhook_url=analysis.webhook_url,
+                        analysis_id=analysis_id,
+                        step_name=StepName.classification,
+                        is_starting=False,
+                        db=db,
+                        step_result=classification
+                    )
+                except Exception as e:
+                    logger.error(f"[{analysis_id}] Erro ao enviar webhook de conclusão: {e}")
+            
             logger.info(f"[{analysis_id}] ===== ETAPA CONCLUÍDA: classification (Classificação: {final_classification}, Confiança: {confidence:.2%}) =====")
             
             # 8. Gerar relatório
             logger.info(f"[{analysis_id}] ===== INICIANDO ETAPA: report_generation =====")
+            report_start_time = datetime.utcnow()
+            
+            # Enviar webhook de início da etapa (report_generation não tem AnalysisStep)
+            if analysis.webhook_url:
+                try:
+                    stats = await WebhookService._collect_step_statistics(analysis_id, db)
+                    await WebhookService.send_webhook(
+                        webhook_url=analysis.webhook_url,
+                        event="analysis.step.started",
+                        analysis_id=analysis_id,
+                        data={
+                            "current_step": {
+                                "name": "report_generation",
+                                "status": "running",
+                                "started_at": report_start_time.isoformat() + "Z"
+                            },
+                            "completed_steps": stats["completed_steps"],
+                            "pending_steps": ["cleaning"],
+                            "statistics": stats["statistics"],
+                            "analysis": stats["analysis"]
+                        }
+                    )
+                except Exception as e:
+                    logger.error(f"[{analysis_id}] Erro ao enviar webhook de início: {e}")
+            
             logger.info(f"[{analysis_id}] Gerando relatório forense completo...")
             try:
                 report = AnalysisProcessor._create_report(
@@ -327,6 +464,60 @@ class AnalysisProcessor:
                         # Não falhar análise por causa do upload CDN
                 
                 logger.info(f"[{analysis_id}] ✅ Relatório salvo com sucesso: {report_file_id}")
+                
+                # Enviar webhook de conclusão da etapa report_generation
+                if analysis.webhook_url:
+                    try:
+                        report_end_time = datetime.utcnow()
+                        report_duration = (report_end_time - report_start_time).total_seconds()
+                        
+                        # Buscar report_file atualizado para obter CDN URL
+                        result = await db.execute(
+                            select(File).where(File.id == report_file_id)
+                        )
+                        report_file_updated = result.scalar_one_or_none()
+                        cdn_url = None
+                        if report_file_updated and report_file_updated.cdn_url:
+                            cdn_url = report_file_updated.cdn_url
+                        
+                        stats = await WebhookService._collect_step_statistics(analysis_id, db)
+                        await WebhookService.send_webhook(
+                            webhook_url=analysis.webhook_url,
+                            event="analysis.step.completed",
+                            analysis_id=analysis_id,
+                            data={
+                                "current_step": {
+                                    "name": "report_generation",
+                                    "status": "completed",
+                                    "started_at": report_start_time.isoformat() + "Z",
+                                    "completed_at": report_end_time.isoformat() + "Z",
+                                    "duration_seconds": round(report_duration, 2),
+                                    "result": {
+                                        "report_generated": True,
+                                        "report_file_id": str(report_file_id),
+                                        "cdn_url": cdn_url
+                                    }
+                                },
+                                "completed_steps": stats["completed_steps"] + [{
+                                    "name": "report_generation",
+                                    "status": "completed",
+                                    "started_at": report_start_time.isoformat() + "Z",
+                                    "completed_at": report_end_time.isoformat() + "Z",
+                                    "duration_seconds": round(report_duration, 2),
+                                    "result": {
+                                        "report_generated": True,
+                                        "report_file_id": str(report_file_id),
+                                        "cdn_url": cdn_url
+                                    }
+                                }],
+                                "pending_steps": ["cleaning"],
+                                "statistics": stats["statistics"],
+                                "analysis": stats["analysis"]
+                            }
+                        )
+                    except Exception as e:
+                        logger.error(f"[{analysis_id}] Erro ao enviar webhook de conclusão: {e}")
+                
                 logger.info(f"[{analysis_id}] ===== ETAPA CONCLUÍDA: report_generation =====")
             except Exception as report_error:
                 logger.error(f"[{analysis_id}] Erro ao salvar relatório: {report_error}", exc_info=True)
@@ -340,6 +531,19 @@ class AnalysisProcessor:
                 analysis_id, StepName.cleaning, StepStatus.running, 0, db
             )
             
+            # Enviar webhook de início da etapa
+            if analysis.webhook_url:
+                try:
+                    await WebhookService.send_step_update(
+                        webhook_url=analysis.webhook_url,
+                        analysis_id=analysis_id,
+                        step_name=StepName.cleaning,
+                        is_starting=True,
+                        db=db
+                    )
+                except Exception as e:
+                    logger.error(f"[{analysis_id}] Erro ao enviar webhook de início: {e}")
+            
             logger.info(f"[{analysis_id}] Gerando vídeo limpo (removendo fingerprints de IA)...")
             
             # Verificar se FFmpeg está disponível antes de tentar
@@ -350,6 +554,21 @@ class AnalysisProcessor:
                 await AnalysisProcessor._update_step(
                     analysis_id, StepName.cleaning, StepStatus.completed, 100, db
                 )
+                await db.refresh(analysis)
+                
+                # Enviar webhook de conclusão da etapa (pulada)
+                if analysis.webhook_url:
+                    try:
+                        await WebhookService.send_step_update(
+                            webhook_url=analysis.webhook_url,
+                            analysis_id=analysis_id,
+                            step_name=StepName.cleaning,
+                            is_starting=False,
+                            db=db,
+                            step_result={"skipped": True, "reason": "FFmpeg não disponível"}
+                        )
+                    except Exception as e:
+                        logger.error(f"[{analysis_id}] Erro ao enviar webhook de conclusão: {e}")
             else:
                 clean_dir = FileService.generate_storage_path(str(analysis_id), FileType.clean_video)
                 clean_dir.mkdir(parents=True, exist_ok=True)
@@ -421,6 +640,36 @@ class AnalysisProcessor:
                 await AnalysisProcessor._update_step(
                     analysis_id, StepName.cleaning, StepStatus.completed, 100, db
                 )
+                await db.refresh(analysis)
+                
+                # Enviar webhook de conclusão da etapa
+                if analysis.webhook_url:
+                    try:
+                        clean_result_data = {}
+                        if analysis.clean_video_id:
+                            clean_result_data = {
+                                "clean_video_generated": True,
+                                "clean_video_id": str(analysis.clean_video_id)
+                            }
+                            # Tentar obter URL do CDN se disponível
+                            result = await db.execute(
+                                select(File).where(File.id == analysis.clean_video_id)
+                            )
+                            clean_file_obj = result.scalar_one_or_none()
+                            if clean_file_obj and clean_file_obj.cdn_url:
+                                clean_result_data["cdn_url"] = clean_file_obj.cdn_url
+                        
+                        await WebhookService.send_step_update(
+                            webhook_url=analysis.webhook_url,
+                            analysis_id=analysis_id,
+                            step_name=StepName.cleaning,
+                            is_starting=False,
+                            db=db,
+                            step_result=clean_result_data if clean_result_data else None
+                        )
+                    except Exception as e:
+                        logger.error(f"[{analysis_id}] Erro ao enviar webhook de conclusão: {e}")
+                
                 logger.info(f"[{analysis_id}] ===== ETAPA CONCLUÍDA: cleaning =====")
             
             # Finalizar análise
