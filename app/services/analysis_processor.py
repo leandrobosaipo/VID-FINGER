@@ -591,8 +591,9 @@ class AnalysisProcessor:
                 
                 if clean_result and Path(clean_result).exists():
                     try:
+                        clean_file_id = uuid.uuid4()
                         clean_file = File(
-                            id=uuid.uuid4(),
+                            id=clean_file_id,
                             analysis_id=analysis_uuid,
                             file_type=FileType.clean_video,
                             original_filename=clean_filename,
@@ -602,11 +603,37 @@ class AnalysisProcessor:
                             mime_type=original_file.mime_type,
                             checksum=FileService.calculate_checksum(Path(clean_result))
                         )
+                        logger.info(f"[{analysis_id}] Adicionando clean_file ao banco: {clean_file_id}")
                         db.add(clean_file)
-                        analysis.clean_video_id = clean_file.id
-                        await db.commit()
+                        
+                        # Fazer flush para garantir que clean_file seja inserido antes de atualizar analysis
+                        await db.flush()
+                        logger.info(f"[{analysis_id}] Flush concluído, clean_file inserido no banco")
+                        
+                        # Buscar análise novamente para garantir que está na sessão atual
+                        logger.info(f"[{analysis_id}] Buscando análise novamente na sessão atual...")
+                        result = await db.execute(
+                            select(Analysis).where(Analysis.id == analysis_uuid)
+                        )
+                        analysis = result.scalar_one_or_none()
+                        
+                        if not analysis:
+                            raise ValueError(f"Análise não encontrada após buscar novamente: {analysis_id}")
+                        
+                        logger.info(f"[{analysis_id}] Setando clean_video_id na análise: {clean_file_id}")
+                        analysis.clean_video_id = clean_file_id
+                        
+                        logger.info(f"[{analysis_id}] Fazendo commit do vídeo limpo...")
+                        try:
+                            await db.commit()
+                            logger.info(f"[{analysis_id}] Commit concluído com sucesso")
+                        except Exception as commit_error:
+                            logger.error(f"[{analysis_id}] ❌ ERRO no commit: {commit_error}", exc_info=True)
+                            await db.rollback()
+                            raise
+                        
                         await db.refresh(analysis)
-                        logger.info(f"[{analysis_id}] Vídeo limpo salvo: {clean_file.id}")
+                        logger.info(f"[{analysis_id}] Vídeo limpo salvo: {clean_file_id}")
                         
                         # Upload para CDN se configurado
                         if settings.UPLOAD_TO_CDN and storage_service.s3_client:
@@ -634,8 +661,15 @@ class AnalysisProcessor:
                                 logger.error(f"[{analysis_id}] Erro ao fazer upload do vídeo limpo para CDN: {cdn_error}", exc_info=True)
                                 # Não falhar análise por causa do upload CDN
                     except Exception as save_error:
-                        logger.error(f"[{analysis_id}] Erro ao salvar vídeo limpo no banco: {save_error}", exc_info=True)
-                        # Continuar mesmo se falhar ao salvar no banco
+                        logger.error(f"[{analysis_id}] ❌ Erro ao salvar vídeo limpo no banco: {save_error}", exc_info=True)
+                        # Fazer rollback para limpar a sessão
+                        try:
+                            await db.rollback()
+                            logger.info(f"[{analysis_id}] Rollback executado após erro ao salvar vídeo limpo")
+                        except Exception as rollback_error:
+                            logger.error(f"[{analysis_id}] Erro ao fazer rollback: {rollback_error}", exc_info=True)
+                        # Continuar mesmo se falhar ao salvar no banco - análise pode ser concluída sem vídeo limpo
+                        logger.warning(f"[{analysis_id}] Continuando análise sem vídeo limpo devido ao erro")
                 
                 await AnalysisProcessor._update_step(
                     analysis_id, StepName.cleaning, StepStatus.completed, 100, db
