@@ -37,5 +37,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 # Comando de start (usa PORT do ambiente ou 8000 como padrão)
 # Executa migrações antes de iniciar o servidor
-CMD ["sh", "-c", "alembic upgrade head && python3 -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Configura timeout de 30 minutos e limite de requisições para suportar uploads grandes
+CMD ["sh", "-c", "alembic upgrade head && python3 -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --timeout-keep-alive ${REQUEST_TIMEOUT:-1800} --limit-max-requests 1000"]
 

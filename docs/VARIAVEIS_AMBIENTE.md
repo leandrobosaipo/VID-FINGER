@@ -130,6 +130,26 @@ MAX_FILE_SIZE=10737418240
 CHUNK_SIZE=5242880
 ```
 
+### Server/Request Limits
+
+```bash
+# Timeout para requisições longas (como uploads grandes) em segundos (padrão: 1800 = 30 minutos)
+REQUEST_TIMEOUT=1800
+
+# Limite de tamanho de requisição em bytes (10GB, mesmo que MAX_FILE_SIZE)
+MAX_REQUEST_SIZE=10737418240
+```
+
+**Importante:** 
+- O `REQUEST_TIMEOUT` controla o timeout do Uvicorn para requisições longas. O valor padrão de 1800 segundos (30 minutos) é adequado para uploads grandes.
+- O `MAX_REQUEST_SIZE` define o limite máximo de tamanho de requisição no Uvicorn. Deve ser igual ou maior que `MAX_FILE_SIZE`.
+- Se você estiver enfrentando timeouts em uploads grandes, aumente o `REQUEST_TIMEOUT` conforme necessário.
+- Em ambientes com proxy reverso (como EasyPanel), o proxy também pode ter seu próprio timeout que precisa ser configurado separadamente.
+
+**Troubleshooting:**
+- Se uploads grandes falharem com timeout de 60 segundos, verifique se `REQUEST_TIMEOUT` está configurado corretamente.
+- Se o erro persistir, pode ser necessário configurar timeout no proxy reverso (EasyPanel/Nginx) também.
+
 ### Webhooks
 
 ```bash
@@ -216,6 +236,12 @@ UPLOAD_TO_CDN=True
 STORAGE_PATH=/app/storage
 MAX_FILE_SIZE=10737418240
 CHUNK_SIZE=5242880
+
+# ============================================
+# SERVER/REQUEST LIMITS
+# ============================================
+REQUEST_TIMEOUT=1800
+MAX_REQUEST_SIZE=10737418240
 
 # ============================================
 # APLICAÇÃO

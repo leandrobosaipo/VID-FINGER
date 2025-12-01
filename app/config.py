@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     LOG_FILE: Optional[str] = None  # Se None, só console. Ex: /app/logs/app.log
     LOG_FORMAT: str = "structured"  # structured ou simple
     
+    # Server/Request Limits
+    REQUEST_TIMEOUT: int = 1800  # 30 minutos (timeout para requisições longas como uploads)
+    MAX_REQUEST_SIZE: int = 10737418240  # 10GB (limite de tamanho de requisição no Uvicorn)
+    
     class Config:
         env_file = ".env"
         case_sensitive = True
