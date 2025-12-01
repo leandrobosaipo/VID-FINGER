@@ -449,7 +449,8 @@ class AnalysisProcessor:
                         cdn_url = storage_service.upload_file(
                             report_path,
                             key,
-                            content_type="application/json"
+                            content_type="application/json",
+                            analysis_id=str(analysis_id)
                         )
                         if cdn_url:
                             report_file.cdn_url = cdn_url
@@ -647,7 +648,8 @@ class AnalysisProcessor:
                                 cdn_url = storage_service.upload_file(
                                     Path(clean_result),
                                     key,
-                                    content_type=original_file.mime_type
+                                    content_type=original_file.mime_type,
+                                    analysis_id=str(analysis_id)
                                 )
                                 if cdn_url:
                                     clean_file.cdn_url = cdn_url

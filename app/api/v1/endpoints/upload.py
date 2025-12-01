@@ -1,5 +1,6 @@
 """Endpoints de upload."""
 import mimetypes
+import logging
 from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, status, Query, Request, BackgroundTasks
@@ -8,6 +9,7 @@ from app.database import get_db
 from app.services.upload_service import UploadService
 from app.services.analysis_service import AnalysisService
 from app.utils.formatters import format_success_response, format_error_response
+from app.utils.context import get_correlation_id, format_log_with_context
 from app.api.v1.schemas import (
     UploadInitResponse,
     ChunkUploadResponse,
@@ -18,6 +20,7 @@ from app.api.v1.schemas import (
 from app.config import settings
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post(
@@ -358,53 +361,179 @@ async def analyze_video(
     
     Recebe arquivo, processa upload e inicia análise automaticamente.
     """
+    correlation_id = get_correlation_id()
+    analysis_id_str = None
+    
     try:
+        # Log: Recebimento do arquivo
+        filename = file.filename or "unknown"
+        logger.info(
+            format_log_with_context(
+                "UPLOAD",
+                f"Recebido arquivo: {filename} | MIME type: {file.content_type}",
+            )
+        )
+        
+        # Ler arquivo para obter tamanho
+        content = await file.read()
+        file_size = len(content)
+        
+        # Restaurar conteúdo do arquivo para processamento
+        async def receive():
+            return {"type": "http.request", "body": content}
+        file._receive = receive
+        
+        logger.info(
+            format_log_with_context(
+                "UPLOAD",
+                f"Arquivo lido: {filename} ({file_size} bytes) | MIME: {file.content_type}",
+            )
+        )
+        
+        # Validar tipo de arquivo
+        from app.utils.validators import validate_file_type
+        is_valid, error = validate_file_type(filename, file.content_type or "")
+        if not is_valid:
+            logger.warning(
+                format_log_with_context(
+                    "UPLOAD",
+                    f"Validação de tipo falhou: {error}",
+                )
+            )
+            raise ValueError(error)
+        
+        logger.debug(
+            format_log_with_context(
+                "UPLOAD",
+                f"Validação de tipo OK: {filename} ({file.content_type})",
+            )
+        )
+        
+        # Validar tamanho
+        from app.utils.validators import validate_file_size
+        is_valid, error = validate_file_size(file_size, settings.MAX_FILE_SIZE)
+        if not is_valid:
+            logger.warning(
+                format_log_with_context(
+                    "UPLOAD",
+                    f"Validação de tamanho falhou: {error}",
+                )
+            )
+            raise ValueError(error)
+        
+        logger.debug(
+            format_log_with_context(
+                "UPLOAD",
+                f"Validação de tamanho OK: {file_size} bytes (máx: {settings.MAX_FILE_SIZE})",
+            )
+        )
+        
         # Criar análise diretamente do arquivo
+        logger.info(
+            format_log_with_context(
+                "UPLOAD",
+                f"Iniciando criação de análise a partir de arquivo: {filename}",
+                **({"webhook_url": "fornecido"} if webhook_url else {})
+            )
+        )
+        
         analysis_id = await AnalysisService.create_analysis_from_file(
             file=file,
             webhook_url=webhook_url,
             db=db
         )
         
+        analysis_id_str = str(analysis_id)
+        
+        logger.info(
+            format_log_with_context(
+                "UPLOAD",
+                f"Análise criada com sucesso: analysis_id={analysis_id_str}",
+                analysis_id=analysis_id_str
+            )
+        )
+        
         # Iniciar processamento em background
-        # Usar BackgroundTasks (preferencial) ou asyncio.create_task como fallback
-        import logging
         import asyncio
-        logger = logging.getLogger(__name__)
-        logger.info(f"[UPLOAD] Iniciando processamento para análise {analysis_id}")
+        logger.info(
+            format_log_with_context(
+                "UPLOAD",
+                f"Iniciando processamento em background para análise {analysis_id_str}",
+                analysis_id=analysis_id_str
+            )
+        )
         
         # Tentar usar BackgroundTasks primeiro (mais confiável no FastAPI)
         try:
             background_tasks.add_task(
                 AnalysisService.start_processing_background,
-                str(analysis_id)
+                analysis_id_str
             )
-            logger.info(f"[UPLOAD] Task adicionada ao BackgroundTasks para análise {analysis_id}")
+            logger.info(
+                format_log_with_context(
+                    "UPLOAD",
+                    f"Task adicionada ao BackgroundTasks para análise {analysis_id_str}",
+                    analysis_id=analysis_id_str
+                )
+            )
         except Exception as bg_error:
-            logger.warning(f"[UPLOAD] BackgroundTasks falhou ({bg_error}), usando asyncio.create_task")
+            logger.warning(
+                format_log_with_context(
+                    "UPLOAD",
+                    f"BackgroundTasks falhou ({bg_error}), usando asyncio.create_task",
+                    analysis_id=analysis_id_str
+                )
+            )
             # Fallback: usar asyncio.create_task diretamente
             try:
                 loop = asyncio.get_running_loop()
                 loop.create_task(
-                    AnalysisService.start_processing_background(str(analysis_id))
+                    AnalysisService.start_processing_background(analysis_id_str)
                 )
-                logger.info(f"[UPLOAD] Task criada via asyncio para análise {analysis_id}")
+                logger.info(
+                    format_log_with_context(
+                        "UPLOAD",
+                        f"Task criada via asyncio para análise {analysis_id_str}",
+                        analysis_id=analysis_id_str
+                    )
+                )
             except Exception as task_error:
-                logger.error(f"[UPLOAD] Erro ao criar task: {task_error}", exc_info=True)
+                logger.error(
+                    format_log_with_context(
+                        "UPLOAD",
+                        f"Erro ao criar task: {task_error}",
+                        analysis_id=analysis_id_str
+                    ),
+                    exc_info=True
+                )
         
         # Gerar URL base (usar settings por padrão)
         base_url = settings.API_BASE_URL or "http://localhost:8000"
+        status_url = f"{base_url}/api/v1/analysis/{analysis_id_str}"
         
-        status_url = f"{base_url}/api/v1/analysis/{analysis_id}"
+        logger.info(
+            format_log_with_context(
+                "UPLOAD",
+                f"Resposta preparada: analysis_id={analysis_id_str}, status_url={status_url}",
+                analysis_id=analysis_id_str
+            )
+        )
         
         return AnalysisStartResponse(
-            analysis_id=str(analysis_id),
+            analysis_id=analysis_id_str,
             status="processing",
             status_url=status_url,
             message="Arquivo recebido e análise iniciada. Use status_url para acompanhar o progresso."
         )
     
     except ValueError as e:
+        logger.warning(
+            format_log_with_context(
+                "UPLOAD",
+                f"Erro de validação: {str(e)}",
+                analysis_id=analysis_id_str
+            )
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=format_error_response(
@@ -413,6 +542,14 @@ async def analyze_video(
             )
         )
     except Exception as e:
+        logger.error(
+            format_log_with_context(
+                "UPLOAD",
+                f"Erro ao processar arquivo: {type(e).__name__}: {str(e)}",
+                analysis_id=analysis_id_str
+            ),
+            exc_info=True
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=format_error_response(

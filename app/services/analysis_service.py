@@ -14,6 +14,7 @@ from app.services.upload_service import UploadService
 from app.services.file_service import FileService
 from app.services.storage_service import storage_service
 from app.services.webhook_service import WebhookService
+from app.utils.context import format_log_with_context
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -69,7 +70,13 @@ class AnalysisService:
         db.add(original_file)
         await db.commit()
         await db.refresh(original_file)
-        logger.info(f"[ANALYSIS] file_saved id={original_file.id} path={original_file.file_path}")
+        logger.info(
+            format_log_with_context(
+                "ANALYSIS",
+                f"Arquivo original persistido no banco: file_id={original_file.id}, path={original_file.file_path}, size={original_file.file_size}",
+                analysis_id=str(analysis_id)
+            )
+        )
         
         # 2) Criar análise referenciando o arquivo já persistido
         analysis = Analysis(
@@ -83,7 +90,13 @@ class AnalysisService:
         db.add(analysis)
         await db.commit()
         await db.refresh(analysis)
-        logger.info(f"[ANALYSIS] analysis_created id={analysis.id} original_file_id={analysis.original_file_id}")
+        logger.info(
+            format_log_with_context(
+                "ANALYSIS",
+                f"Análise criada e persistida no banco: analysis_id={analysis.id}, original_file_id={analysis.original_file_id}, status={analysis.status.value}",
+                analysis_id=str(analysis.id)
+            )
+        )
         
         # 3) Criar etapas iniciais e vincular arquivo à análise
         steps = [
@@ -154,16 +167,30 @@ class AnalysisService:
                     cdn_url = storage_service.upload_file(
                         file_path_obj,
                         key,
-                        content_type=original_file.mime_type
+                        content_type=original_file.mime_type,
+                        analysis_id=str(analysis_id)
                     )
                     if cdn_url:
                         original_file.cdn_url = cdn_url
                         original_file.cdn_uploaded = True
                         await db.commit()
                         await db.refresh(original_file)
-                        logger.info(f"Arquivo enviado para CDN: {cdn_url}")
+                        logger.info(
+                            format_log_with_context(
+                                "ANALYSIS",
+                                f"Arquivo original enviado para CDN: url={cdn_url}",
+                                analysis_id=str(analysis_id)
+                            )
+                        )
             except Exception as e:
-                logger.error(f"Erro ao fazer upload para CDN: {e}")
+                logger.error(
+                    format_log_with_context(
+                        "ANALYSIS",
+                        f"Erro ao fazer upload para CDN: {str(e)}",
+                        analysis_id=str(analysis_id)
+                    ),
+                    exc_info=True
+                )
         
         # Enviar webhook de upload completo
         if webhook_url:

@@ -6,15 +6,13 @@ from contextlib import asynccontextmanager
 from app.config import settings
 from app.api.v1.router import api_router
 from app.services.file_service import FileService
+from app.utils.logger import setup_logging, get_logger
+from app.middleware.request_logging import RequestLoggingMiddleware
 
-# Configurar logging humanizado
-logging.basicConfig(
-    level=logging.INFO,
-    format='[%(asctime)s] %(levelname)s %(name)s: %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
+# Configurar logging centralizado (deve ser feito antes de qualquer log)
+setup_logging()
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def format_log_message(emoji: str, message: str) -> str:
@@ -123,6 +121,9 @@ app = FastAPI(
         },
     ]
 )
+
+# Middleware de logging de requisições (deve ser o primeiro)
+app.add_middleware(RequestLoggingMiddleware)
 
 # CORS
 app.add_middleware(

@@ -1,9 +1,13 @@
 """Utilitários para upload em chunks."""
 import hashlib
 import os
+import logging
 from pathlib import Path
 from typing import Dict, Optional
 from app.config import settings
+from app.utils.context import format_log_with_context
+
+logger = logging.getLogger(__name__)
 
 
 class ChunkedUploadManager:
@@ -27,6 +31,14 @@ class ChunkedUploadManager:
         self.total_chunks = total_chunks
         self.mime_type = mime_type
         
+        logger.debug(
+            format_log_with_context(
+                "CHUNKED_UPLOAD",
+                f"Inicializando: upload_id={self.upload_id}, dir={self.upload_dir}, filename={filename}, size={file_size}, chunks={total_chunks}",
+                upload_id=self.upload_id
+            )
+        )
+        
         # Salvar metadados
         metadata_file = self.upload_dir / "metadata.json"
         import json
@@ -37,18 +49,52 @@ class ChunkedUploadManager:
                 "total_chunks": total_chunks,
                 "mime_type": mime_type
             }, f)
+        
+        logger.debug(
+            format_log_with_context(
+                "CHUNKED_UPLOAD",
+                f"Metadados salvos: upload_id={self.upload_id}, metadata_file={metadata_file}",
+                upload_id=self.upload_id
+            )
+        )
     
     def save_chunk(self, chunk_number: int, chunk_data: bytes) -> bool:
         """Salva chunk individual."""
         chunk_file = self.upload_dir / f"chunk_{chunk_number:05d}"
+        chunk_size = len(chunk_data)
+        
+        logger.debug(
+            format_log_with_context(
+                "CHUNKED_UPLOAD",
+                f"Salvando chunk: upload_id={self.upload_id}, chunk_number={chunk_number}, size={chunk_size}, file={chunk_file.name}",
+                upload_id=self.upload_id
+            )
+        )
         
         try:
             with open(chunk_file, "wb") as f:
                 f.write(chunk_data)
             
             self.chunks_received[chunk_number] = True
+            
+            logger.debug(
+                format_log_with_context(
+                    "CHUNKED_UPLOAD",
+                    f"Chunk salvo: upload_id={self.upload_id}, chunk_number={chunk_number}, chunks_received={len(self.chunks_received)}/{self.total_chunks or '?'}",
+                    upload_id=self.upload_id
+                )
+            )
+            
             return True
-        except Exception:
+        except Exception as e:
+            logger.error(
+                format_log_with_context(
+                    "CHUNKED_UPLOAD",
+                    f"Erro ao salvar chunk: upload_id={self.upload_id}, chunk_number={chunk_number}, error={str(e)}",
+                    upload_id=self.upload_id
+                ),
+                exc_info=True
+            )
             return False
     
     def has_chunk(self, chunk_number: int) -> bool:
@@ -74,7 +120,22 @@ class ChunkedUploadManager:
     def assemble_file(self, output_path: Path) -> Optional[str]:
         """Monta arquivo final a partir dos chunks."""
         if not self.is_complete():
+            logger.warning(
+                format_log_with_context(
+                    "CHUNKED_UPLOAD",
+                    f"Tentativa de montar arquivo incompleto: upload_id={self.upload_id}, chunks_received={len(self.chunks_received)}/{self.total_chunks or '?'}",
+                    upload_id=self.upload_id
+                )
+            )
             return None
+        
+        logger.info(
+            format_log_with_context(
+                "CHUNKED_UPLOAD",
+                f"Montando arquivo: upload_id={self.upload_id}, output_path={output_path}, chunks={self.total_chunks}",
+                upload_id=self.upload_id
+            )
+        )
         
         try:
             # Ordenar chunks
@@ -83,22 +144,71 @@ class ChunkedUploadManager:
                 for i in range(self.total_chunks)
             ])
             
+            logger.debug(
+                format_log_with_context(
+                    "CHUNKED_UPLOAD",
+                    f"Chunks encontrados: upload_id={self.upload_id}, count={len(chunk_files)}",
+                    upload_id=self.upload_id
+                )
+            )
+            
             # Montar arquivo
+            total_bytes = 0
             with open(output_path, "wb") as outfile:
                 for chunk_file in chunk_files:
                     if not chunk_file.exists():
+                        logger.error(
+                            format_log_with_context(
+                                "CHUNKED_UPLOAD",
+                                f"Chunk não encontrado: upload_id={self.upload_id}, chunk_file={chunk_file.name}",
+                                upload_id=self.upload_id
+                            )
+                        )
                         return None
                     with open(chunk_file, "rb") as infile:
-                        outfile.write(infile.read())
+                        chunk_data = infile.read()
+                        outfile.write(chunk_data)
+                        total_bytes += len(chunk_data)
+            
+            logger.debug(
+                format_log_with_context(
+                    "CHUNKED_UPLOAD",
+                    f"Arquivo montado: upload_id={self.upload_id}, total_bytes={total_bytes}",
+                    upload_id=self.upload_id
+                )
+            )
             
             # Calcular checksum
+            logger.debug(
+                format_log_with_context(
+                    "CHUNKED_UPLOAD",
+                    f"Calculando checksum: upload_id={self.upload_id}",
+                    upload_id=self.upload_id
+                )
+            )
             checksum = self._calculate_checksum(output_path)
             
             # Limpar chunks
             self.cleanup()
             
+            logger.info(
+                format_log_with_context(
+                    "CHUNKED_UPLOAD",
+                    f"Arquivo montado com sucesso: upload_id={self.upload_id}, output_path={output_path}, checksum=sha256:{checksum[:16]}...",
+                    upload_id=self.upload_id
+                )
+            )
+            
             return checksum
         except Exception as e:
+            logger.error(
+                format_log_with_context(
+                    "CHUNKED_UPLOAD",
+                    f"Erro ao montar arquivo: upload_id={self.upload_id}, error={str(e)}",
+                    upload_id=self.upload_id
+                ),
+                exc_info=True
+            )
             return None
     
     def _calculate_checksum(self, file_path: Path) -> str:

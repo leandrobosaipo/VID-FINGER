@@ -73,6 +73,11 @@ class Settings(BaseSettings):
     # API Base URL (para geração de URLs completas)
     API_BASE_URL: Optional[str] = None  # Se None, será inferido do Request
     
+    # Logging
+    LOG_LEVEL: str = "INFO"  # INFO, DEBUG, WARNING, ERROR
+    LOG_FILE: Optional[str] = None  # Se None, só console. Ex: /app/logs/app.log
+    LOG_FORMAT: str = "structured"  # structured ou simple
+    
     class Config:
         env_file = ".env"
         case_sensitive = True
