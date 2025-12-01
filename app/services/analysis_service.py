@@ -273,40 +273,63 @@ class AnalysisService:
     
     @staticmethod
     async def create_analysis_from_file(
-        file: "UploadFile",
+        file_content: bytes,
+        filename: str,
         webhook_url: Optional[str],
-        db: AsyncSession
+        db: AsyncSession,
+        mime_type: Optional[str] = None
     ) -> uuid.UUID:
         """
-        Cria análise diretamente a partir de arquivo.
+        Cria análise diretamente a partir de conteúdo de arquivo.
         
         Processa upload internamente e inicia análise automaticamente.
+        
+        Args:
+            file_content: Conteúdo do arquivo em bytes (já lido)
+            filename: Nome do arquivo
+            webhook_url: URL do webhook (opcional)
+            db: Sessão do banco de dados
+            mime_type: Tipo MIME do arquivo (opcional, será detectado se não fornecido)
         """
-        from fastapi import UploadFile
         import mimetypes
         from pathlib import Path
         
-        # Extrair informações do arquivo
-        filename = file.filename or "video.mp4"
-        content = await file.read()
-        file_size = len(content)
+        file_size = len(file_content)
         
-        # Detectar MIME type
-        mime_type, _ = mimetypes.guess_type(filename)
-        if not mime_type or not mime_type.startswith('video/'):
-            ext = Path(filename).suffix.lower()
-            mime_map = {
-                '.mp4': 'video/mp4',
-                '.mov': 'video/quicktime',
-                '.avi': 'video/x-msvideo',
-                '.mkv': 'video/x-matroska',
-                '.webm': 'video/webm'
-            }
-            mime_type = mime_map.get(ext, 'video/mp4')
+        # Validar tamanho
+        if file_size == 0:
+            logger.warning(
+                format_log_with_context(
+                    "ANALYSIS",
+                    f"Arquivo recebido com tamanho zero: {filename}"
+                )
+            )
+            raise ValueError("Tamanho do arquivo deve ser maior que zero")
+        
+        # Detectar MIME type se não fornecido
+        if not mime_type:
+            mime_type, _ = mimetypes.guess_type(filename)
+            if not mime_type or not mime_type.startswith('video/'):
+                ext = Path(filename).suffix.lower()
+                mime_map = {
+                    '.mp4': 'video/mp4',
+                    '.mov': 'video/quicktime',
+                    '.avi': 'video/x-msvideo',
+                    '.mkv': 'video/x-matroska',
+                    '.webm': 'video/webm'
+                }
+                mime_type = mime_map.get(ext, 'video/mp4')
+        
+        logger.info(
+            format_log_with_context(
+                "ANALYSIS",
+                f"Criando análise a partir de arquivo: filename={filename}, size={file_size}, mime_type={mime_type}"
+            )
+        )
         
         # Fazer upload direto
         upload_id = UploadService.upload_file_direct(
-            file_content=content,
+            file_content=file_content,
             filename=filename,
             mime_type=mime_type
         )

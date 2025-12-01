@@ -378,10 +378,15 @@ async def analyze_video(
         content = await file.read()
         file_size = len(content)
         
-        # Restaurar conteúdo do arquivo para processamento
-        async def receive():
-            return {"type": "http.request", "body": content}
-        file._receive = receive
+        # Validar tamanho zero antes de continuar
+        if file_size == 0:
+            logger.warning(
+                format_log_with_context(
+                    "UPLOAD",
+                    f"Arquivo recebido com tamanho zero: {filename}",
+                )
+            )
+            raise ValueError("Tamanho do arquivo deve ser maior que zero")
         
         logger.info(
             format_log_with_context(
@@ -438,9 +443,11 @@ async def analyze_video(
         )
         
         analysis_id = await AnalysisService.create_analysis_from_file(
-            file=file,
+            file_content=content,
+            filename=filename,
             webhook_url=webhook_url,
-            db=db
+            db=db,
+            mime_type=file.content_type
         )
         
         analysis_id_str = str(analysis_id)
