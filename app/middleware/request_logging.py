@@ -95,6 +95,25 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         status_code = response.status_code
         status_emoji = "✅" if 200 <= status_code < 300 else "⚠️" if 300 <= status_code < 400 else "❌"
         
+        # Obter status text de forma segura (nem todos os tipos de Response têm status_text)
+        status_text = getattr(response, 'status_text', None)
+        if status_text is None:
+            # Mapear códigos comuns para texto
+            status_map = {
+                200: "OK",
+                201: "Created",
+                202: "Accepted",
+                204: "No Content",
+                400: "Bad Request",
+                401: "Unauthorized",
+                403: "Forbidden",
+                404: "Not Found",
+                500: "Internal Server Error",
+                502: "Bad Gateway",
+                503: "Service Unavailable",
+            }
+            status_text = status_map.get(status_code, "Unknown")
+        
         # Tentar obter tamanho da resposta
         response_size = None
         if hasattr(response, 'body'):
@@ -108,7 +127,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         self.logger.info(
             format_log_with_context(
                 "REQUEST",
-                f"{status_emoji} ← {status_code} {response.status_text} | Duration: {duration:.3f}s{size_info}"
+                f"{status_emoji} ← {status_code} {status_text} | Duration: {duration:.3f}s{size_info}"
             )
         )
         
